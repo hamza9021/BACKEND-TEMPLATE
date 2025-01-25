@@ -161,4 +161,91 @@ const refreshAccessToken = wrapperFunction(async (req, res) => {
     }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken };
+const changeCurrentPassword = wrapperFunction(async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!(oldPassword && newPassword)) {
+        throw new ApiError(404, "Field Should Not Be Empty");
+    }
+
+    const user = await User.findById(req.user._id);
+    const isPasswordCorrect = user.isPasswordMatch(oldPassword);
+
+    if (!isPasswordCorrect) {
+        throw new ApiError(404, "Incorrect Password");
+    }
+
+    user.password = newPassword;
+    await user.save({ validateBeforeSave: false });
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "Password Changes Successfully"));
+});
+
+const getCurrectUser = wrapperFunction(async (req, res) => {
+    return res
+        .status(200)
+        .json(
+            new ApiResponse(200, req.user, "Current User Fetched Successfully")
+        );
+});
+
+const updateUserAccountDetail = wrapperFunction(async (req, res) => {
+    const { fullName, email } = req.body;
+
+    if (!fullName || !email) {
+        throw new ApiError(404, "Please Provide All Necessary Fields");
+    }
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: { fullName, email },
+        },
+        { new: true }
+    ).select("-password");
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "User Updated Successfully"));
+});
+
+const updateUserAvatar = wrapperFunction(async (req, res) => {
+    const avatarLocalPath = req.file?.path;
+
+    if (!avatarLocalPath) {
+        throw new ApiError(404, "Avatar Not Found");
+    }
+
+    const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+    if (!avatar.url) {
+        throw new ApiError(400, "Error While Uploading On Cloud");
+    }
+
+    //DELETE OLD IMAGE FROM CLOUDINARY
+
+    const user = await User.findByIdAndUpdate(
+        req.user._id,
+        {
+            $set: { avatar: avatar.url },
+        },
+        { new: true }
+    ).select("-password");
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, user, "Avatar Updated Successfully"));
+});
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrectUser,
+    updateUserAccountDetail,
+    updateUserAvatar,
+};
